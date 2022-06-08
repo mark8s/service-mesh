@@ -119,8 +119,6 @@ Trace 表示一次完整的追踪链路，trace 由一个或多个 Span 组成�
 - 由起点进程创建一个 Tracer，然后启动进程发起请求，每个动作产生一个 Span，如果有父子关系，Tracer 将它们关联
 - 当请求 / Span 完成后，Tracer 将跟踪信息推送到 Collector
 
-## 
-
 ## Reference
 [Take OpenTracing for a HotROD ride](https://medium.com/opentracing/take-opentracing-for-a-hotrod-ride-f6e3141f7941)
 
