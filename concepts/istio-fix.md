@@ -67,6 +67,13 @@ INTERMEDIATE_SAN_DNS ?= istiod.istio-system.svc
 ```
 这样证书的有效期就有10年了，够用了
 
+使用openssl验证有效期
+```shell
+$ openssl x509 -in ca-test.yaml -noout -dates
+notBefore=Jun  8 03:06:19 2022 GMT
+notAfter=Jun  5 03:06:19 2032 GMT
+```
+
 接下来，可以根据这几个文件，生成一个 secret:
 ```shell
 kubectl create secret generic cacerts -n istio-system \
