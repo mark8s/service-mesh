@@ -212,10 +212,14 @@ Demo2：查看productpage的pod（productpage-v1-6b746f74dc-bkdw2）在Prometheu
 ### 关于unknown
 unknown node： 没有sidecar的pod发出的流量。这些流量不是来自部署了 Envoy 代理的源 pod，因此不是 Mesh 的一部分。
 
+unknown 有两种可能的来源：
+
+- Ingress traffic: Istio 期望流量通过 Ingress Gateway。当您看到“未知”流量时，可能只是您使用标准 Kubernetes Ingress 或 OpenShift 路由将流量从外部发送到 Istio。
+- Internal traffic: 来自“unknown”的另一个流量来源是（Kubernetes）集群内的（正常）pod，它们没有部署 Envoy sidecar，因此不属于网格的一部分。
+
 有篇文章也说到了这个，原文如下：
 
 [Where does the ‘unknown’ traffic in Istio come from (updated)?](https://itnext.io/where-does-the-unknown-taffic-in-istio-come-from-4a9a7e4454c3)
-
 
 ## Reference
 
