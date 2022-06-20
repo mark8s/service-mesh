@@ -72,9 +72,9 @@ appenders 可以 增、删、改 nodes
 
 
 ## 指标中的名称解释
-- reporter: 这标识了请求的报告者。如果报告来自服务器 Istio proxy，则设置为destination，如果报告来自客户端 Istio 代理，则设置为source。如：details
-- app: 当前的应用，相同app标签为一组应用。
-- source: Envoy 代理的下游(DownUpstream)客户端。在服务网格中，source通常是workload，但入口流量的source可能包括其他客户端，例如浏览器或移动应用程序。
+- reporter: metric 报告来源，终点服务（destination）是 envoy 代理的上游客户端。如果是流量的起点，则为source，否则是destination。
+- app: 数据产生的来源应用，相同app标签为一组应用。如app="reviews"，则表示该条数据由reviews服务产生。
+- source: Envoy 代理的下游(DownStream)客户端。在服务网格中，source通常是workload，但入口流量的source可能包括其他客户端，例如浏览器或移动应用程序。
 - source_workload: 这标识了控制源的源工作负载(source workload)的名称。如：productpage-v1
 - source_workload_namespace: 这标识了源工作负载的命名空间。如：default
 - source_principal: 这标识了流量源的对等主体。使用对等身份验证时设置。如：spiffe://cluster.local/ns/default/sa/bookinfo-productpage
@@ -103,9 +103,13 @@ appenders 可以 增、删、改 nodes
 - service_istio_io_canonical_revision: istio注入后的标签指标，原标签为"service.istio.io/canonical-revision: v1"
 - security_istio_io_tlsMode: istio注入后的标签指标，原标签为"security.istio.io/tlsMode: istio"
 
+destination telemetry: 
+- reporter="destination" , 则为destination telemetry。同理，reporter="source" , 则为source telemetry。
+- 没有被istio注入的也为 destination telemetry 。原文： `Unknown sources have no istio sidecar so it is destination telemetry`.
+
 ### 实际案例
 
-Demo1：查看details的pod（details-v1-79f774bdb9-2bwb9）在Prometheus中生成的数据，以及对应的kiali图的情况。
+#### Demo1：查看details的pod（details-v1-79f774bdb9-2bwb9）在Prometheus中生成的数据，以及对应的kiali图的情况。
 
 流量走向：流量从productpage指向details
 
@@ -157,7 +161,7 @@ Demo1：查看details的pod（details-v1-79f774bdb9-2bwb9）在Prometheus中生�
 ![demo1](../images/kiali-metric-1.png)
 
 
-Demo2：查看productpage的pod（productpage-v1-6b746f74dc-bkdw2）在Prometheus中生成的数据，以及对应的kiali图的情况。
+#### Demo2：查看productpage的pod（productpage-v1-6b746f74dc-bkdw2）在Prometheus中生成的数据，以及对应的kiali图的情况。
 
 流量走向：流量从外部指向productpage
 
@@ -204,10 +208,26 @@ Demo2：查看productpage的pod（productpage-v1-6b746f74dc-bkdw2）在Prometheu
   __name__: "istio_request_bytes_count"
 }
 ```
-
 对应的图如下：
 
 ![demo1](../images/kiali-metric-2.png)
+
+
+#### Demo3：关于reporter和destination telemetry
+
+![demo3](../images/kiali-metric-3.png)
+
+productpage 访问 reviews，是以productpage为起点，reviews为终点，此时流量的流向是productpage->reviews，而且 app="productpage" ,所以productpage是source telemetry，reporter="source"。
+
+为什么是productpage->reviews？ 右侧数据中已经很清楚了，source_XXX 的只都与productpage相关，destination_XXX的值与reviews相关，所以流量的流向是 productpage->reviews。
+
+我们再看一个图：
+![demo4](../images/kiali-metric-4.png)
+
+同样，这里的流量的流向是 productpage->reviews，但是 app="reviews" , 所以 reviews 是destination telemetry，reporter="destination"。
+
+app="reviews"的含义是啥？ 它代表着当前数据的应用是reviews这个服务，也就是说当前这条数据是reviews服务产生的。在reviews看来，productpage访问我，我当然是destination了。
+
 
 ### 关于unknown
 unknown node： 没有sidecar的pod发出的流量。这些流量不是来自部署了 Envoy 代理的源 pod，因此不是 Mesh 的一部分。
@@ -220,6 +240,21 @@ unknown 有两种可能的来源：
 有篇文章也说到了这个，原文如下：
 
 [Where does the ‘unknown’ traffic in Istio come from (updated)?](https://itnext.io/where-does-the-unknown-taffic-in-istio-come-from-4a9a7e4454c3)
+
+## trafficMap 生成源码
+
+（1）查询源流量来自unknown节点的
+```shell
+istio_requests_total{reporter="destination",source_workload="unknown",destination_workload_namespace="default"}
+```
+（2）查询来自外部命名空间且不为unknown节点的source telemetry
+```shell
+istio_requests_total{reporter="source",source_workload_namespace!="default",source_workload!="unknown",destination_service_namespace="default"}
+```
+（3）查询 source来自内部namespace的流量，也即内部流量
+```shell
+istio_requests_total{reporter="source",source_workload_namespace="default"}
+```
 
 ## Reference
 
