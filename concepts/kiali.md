@@ -72,7 +72,10 @@ appenders 可以 增、删、改 nodes
 
 
 ## 指标中的名称解释
-- reporter: metric 报告来源，终点服务（destination）是 envoy 代理的上游客户端。如果是流量的起点，则为source，否则是destination。
+kiali查询的istio指标都是envoy去处理的。
+envoy 使用wasm插件将传入和传出的流量指标记录到Envoy统计子系统中，并使它们可供Prometheus抓取。
+
+- reporter: 上报者，metric 报告来源，终点服务（destination）是 envoy 代理的上游客户端。如果是流量的起点，则为source，否则是destination。
 - app: 数据产生的来源应用，相同app标签为一组应用。如app="reviews"，则表示该条数据由reviews服务产生。
 - source: Envoy 代理的下游(DownStream)客户端。在服务网格中，source通常是workload，但入口流量的source可能包括其他客户端，例如浏览器或移动应用程序。
 - source_workload: 这标识了控制源的源工作负载(source workload)的名称。如：productpage-v1
@@ -81,8 +84,8 @@ appenders 可以 增、删、改 nodes
 - source_app: 这会根据源工作负载的应用标签识别源应用。如：productpage
 - source_version: 这标识了源工作负载的版本。如：v1
 - source_cluster: 这标识了源工作负载所在的集群。如：Kubernetes
-- source_canonical_service: 。如：productpage
-- source_canonical_revision: 。如：v1
+- source_canonical_service: 如下。如：productpage
+- source_canonical_revision: 如下。如：v1
 - destination_workload: 这标识了目标工作负载(destination workload)的名称。如：details-v1
 - destination_workload_namespace: 这标识了目标工作负载(destination workload)的命名空间。如：default
 - destination_principal: 这标识了流量目的地的对等主体。使用对等身份验证时设置。如：spiffe://cluster.local/ns/default/sa/bookinfo-details
@@ -91,8 +94,8 @@ appenders 可以 增、删、改 nodes
 - destination_service: 这标识了负责传入请求的目标服务主机。如：details.default.svc.cluster.local
 - destination_service_name: 这标识了目标服务名称。如：details
 - destination_service_namespace: 这标识了目标服务命名空间。如：default
-- destination_canonical_revision: 。如：v1 
-- destination_canonical_service: 。如：details
+- destination_canonical_revision: 如下。如：v1 
+- destination_canonical_service: canonical代表规范，destination_canonical_service代表规范服务。虽然工作负载可以属于多个服务，但是其只能属于一个规范服务。如：details
 - destination_cluster: 这标识了目标工作负载所在的集群。如：Kubernetes
 - request_protocol: 这标识了请求的协议。如果提供，则设置为 API 协议，否则设置为请求或连接协议。如：http
 - response_code: 这标识了请求的响应代码。此标签仅出现在 HTTP 指标上。如：200
@@ -106,6 +109,7 @@ appenders 可以 增、删、改 nodes
 destination telemetry: 
 - reporter="destination" , 则为destination telemetry。同理，reporter="source" , 则为source telemetry。
 - 没有被istio注入的也为 destination telemetry 。原文： `Unknown sources have no istio sidecar so it is destination telemetry`.
+
 
 ### 实际案例
 
@@ -165,6 +169,7 @@ destination telemetry:
 
 流量走向：流量从外部指向productpage
 
+此时的metrics上报者是destination，也就是server端
 
 数据如下：
 

@@ -7,6 +7,11 @@ Istio 服务网格最受欢迎和最强大的功能之一是其先进的可观�
 
 istio的metrics暴露，是通过 envoy wasm 实现的。
 
+目前在Envoy中，有4个内置的WebAssembly扩展：
+- access_log_policy和stackdriver：用于往Google StackDriver推送数据
+- metadata_exchange：做request和response上下游标记，记录请求
+- stats：采集请求相关监控指标，暴露Prometheus 可采集的接口。
+
 
 ## Telemetry V2
 
