@@ -107,7 +107,7 @@ envoy 使用wasm插件将传入和传出的流量指标记录到Envoy统计子�
 - security_istio_io_tlsMode: istio注入后的标签指标，原标签为"security.istio.io/tlsMode: istio"
 
 destination telemetry: 
-- reporter="destination" , 则为destination telemetry。同理，reporter="source" , 则为source telemetry。
+- reporter="destination" , 则为destination telemetry，即为destination上报的数据。同理，reporter="source" , 则为source telemetry。
 - 没有被istio注入的也为 destination telemetry 。原文： `Unknown sources have no istio sidecar so it is destination telemetry`.
 
 
@@ -246,20 +246,24 @@ unknown 有两种可能的来源：
 
 [Where does the ‘unknown’ traffic in Istio come from (updated)?](https://itnext.io/where-does-the-unknown-taffic-in-istio-come-from-4a9a7e4454c3)
 
-## trafficMap 生成源码
 
-（1）查询源流量来自unknown节点的
+## buildNamespaceTrafficMap 源码解读
+
+kiali 处理istio http的流量 有以下几步：
+
+1.查询请求端是unknown的workload
 ```shell
 istio_requests_total{reporter="destination",source_workload="unknown",destination_workload_namespace="default"}
 ```
-（2）查询来自外部命名空间且不为unknown节点的source telemetry
+2.查询请求端是非unknown的workload，且workload所属其他命名空间
 ```shell
 istio_requests_total{reporter="source",source_workload_namespace!="default",source_workload!="unknown",destination_service_namespace="default"}
 ```
-（3）查询 source来自内部namespace的流量，也即内部流量
+3.查询请求端是当前命名空间的workload
 ```shell
 istio_requests_total{reporter="source",source_workload_namespace="default"}
 ```
+![kiali-buildNamespaceTrafficMap](../images/kiali-buildNamespaceTrafficMap.png)
 
 ## Reference
 
