@@ -8,3 +8,28 @@
 
 ![east-west](../images/east-west.png)
 
+## nohup 是脚本后台不中断执行
+
+你可以在Linux命令或者脚本后面增加&符号，从而使命令或脚本在后台执行，例如：.
+```shell
+$ ./curlsolarbookinfo2 &
+```
+使用&符号在后台执行命令或脚本后，如果你退出登录，这个命令就会被自动终止掉。要避免这种情况，你可以使用nohup命令，如下所示：
+```shell
+$ nohup ./curlsolarbookinfo2 &
+```
+
+使用ps -ef |grep curlsolarbookinfo2.sh可查看到正在运行的脚本进程
+退出当前shell终端，再重新打开，使用ps -ef可以看到
+
+脚本内容：
+```shell
+#!/bin/bash 
+
+while true
+do 
+   curl http://bookinfo.solarmesh.cn/productpage
+   sleep 15
+done 
+
+```
