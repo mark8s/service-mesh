@@ -26,3 +26,7 @@ $ istioctl operator remove
 $ istioctl manifest generate | kubectl delete -f -
 $ kubectl delete ns istio-system --grace-period=0 --force
 ```
+
+## zsh安装
+
+[Centos7-Linux安装zsh和oh-my-zsh(内含国内安装方法)](https://blog.csdn.net/qimowei/article/details/119517167)

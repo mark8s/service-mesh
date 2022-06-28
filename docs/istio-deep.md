@@ -24,6 +24,10 @@ pilot包含两个组件：pilot-agent和pilot-discovery。图里的agent对应pi
 - service A/B：使用了istio的应用，如Service A/B的进出网络流量会被proxy接管
 
 
+## 如何调试istio代码？
+[How to remote debug istiod pod using an IDE like IntelliJ or GoLand.](https://github.com/istio/istio/wiki/Remote-Debugging)
+
+
 
 
 
