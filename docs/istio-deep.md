@@ -25,12 +25,104 @@ pilot包含两个组件：pilot-agent和pilot-discovery。图里的agent对应pi
 
 
 ## 如何调试istio代码？
+
+### 调试 pilot-discovery
+
+下载代码
+```shell
+$ git clone https://github.com/mark8s/istio.git
+```
+
+1.编译pilot-discovery
+
+```shell
+$ cd istio/pilot/cmd/pilot-discovery
+$ go build -gcflags=all="-N -l" .
+```
+得到 可执行的 `pilot-discovery`
+
+2.安装dlv
+```shell
+$ git clone https://github.com/go-delve/delve
+$ cd delve
+$ go install github.com/go-delve/delve/cmd/dlv
+```
+
+3.重新构建istio镜像
+
+Dockerfile
+```shell
+FROM docker.io/istio/pilot:1.9.4
+COPY ./pilot-discovery /usr/local/bin/pilot-discovery
+COPY ./dlv /usr/local/bin/dlv
+```
+将`dlv`、`pilot-discovery`、`Dockerfile`放到同一个目录，然后构建成新镜像（`leis17/istio-pilot:1.9.4`）
+
+4.修改istiod的镜像为上面自己build的镜像
+```shell
+$ kubectl edit deployment istiod -n istio-system
+```
+进入istiod pod，如
+```shell
+$ kubectl exec -it istiod-54c88656dd-vt9r9 -n istio-system /bin/bash
+## 执行命令 dlv --listen=:8015 --headless=true --api-version=2 --log attach $pid
+## ps -ef 获取进程pid
+$ istio-proxy@istiod-54c88656dd-vt9r9:/$ ps -ef
+UID        PID  PPID  C STIME TTY          TIME CMD
+istio-p+     1     0  0 07:03 ?        00:00:06 /usr/local/bin/pilot-discovery discovery --monitoringAddr=:15014 --log_
+istio-p+    20     0  0 07:05 pts/0    00:00:00 /bin/bash
+istio-p+    45    20  0 07:14 pts/0    00:00:00 ps -ef
+
+istio-proxy@istiod-54c88656dd-vt9r9:/$ dlv --listen=:8015 --headless=true --api-version=2 --log attach 1
+API server listening at: [::]:8015
+2022-06-29T07:32:44Z warning layer=rpc Listening for remote connections (connections are not authenticated nor encrypted)
+2022-06-29T07:32:44Z info layer=debugger attaching to pid 1
+2022-06-29T07:32:44Z warning layer=debugger can't find build-id note on binary
+2022-06-29T07:33:53Z info layer=debugger created breakpoint: &api.Breakpoint{ID:1, Name:"", Addr:0x34c3d02, Addrs:[]uint64{0x34c3d02}, File:"/root/istio/pilot/pkg/booter.go", Line:580, FunctionName:"istio.io/istio/pilot/pkg/bootstrap.(*Server).initIstiodAdminServer", Cond:"", HitCond:"", Tracepoint:false, TraceReturn:false, Goroutintacktrace:0, Variables:[]string(nil), LoadArgs:(*api.LoadConfig)(nil), LoadLocals:(*api.LoadConfig)(nil), WatchExpr:"", WatchType:0x0, VerboseDescr:[]string(nil), HitCtring]uint64{}, TotalHitCount:0x0, Disabled:false, UserData:interface {}(nil)}
+2022-06-29T07:33:53Z info layer=debugger created breakpoint: &api.Breakpoint{ID:2, Name:"", Addr:0x34bef3f, Addrs:[]uint64{0x34bef3f}, File:"/root/istio/pilot/pkg/booter.go", Line:188, FunctionName:"istio.io/istio/pilot/pkg/bootstrap.NewServer", Cond:"", HitCond:"", Tracepoint:false, TraceReturn:false, Goroutine:false, Stacktrace:0,:[]string(nil), LoadArgs:(*api.LoadConfig)(nil), LoadLocals:(*api.LoadConfig)(nil), WatchExpr:"", WatchType:0x0, VerboseDescr:[]string(nil), HitCount:map[string]uint64itCount:0x0, Disabled:false, UserData:interface {}(nil)}
+2022-06-29T07:33:53Z info layer=debugger created breakpoint: &api.Breakpoint{ID:3, Name:"", Addr:0x34e3059, Addrs:[]uint64{0x34e3059}, File:"/root/istio/pilot/cmd/piloy/main.go", Line:70, FunctionName:"main.glob..func2", Cond:"", HitCond:"", Tracepoint:false, TraceReturn:false, Goroutine:false, Stacktrace:0, Variables:[]string(nil),(*api.LoadConfig)(nil), LoadLocals:(*api.LoadConfig)(nil), WatchExpr:"", WatchType:0x0, VerboseDescr:[]string(nil), HitCount:map[string]uint64{}, TotalHitCount:0x0, Dise, UserData:interface {}(nil)}
+2022-06-29T07:33:53Z debug layer=debugger continuing
+
+```
+
+5.将8015暴露出来
+```shell
+kubectl port-forward --address 0.0.0.0 deployment.apps/istiod -n istio-system 8015:8015 
+Forwarding from 0.0.0.0:8015 -> 8015
+Handling connection for 8015
+E0629 07:30:45.350103   17656 portforward.go:400] an error occurred forwarding 8015 -> 8015: error forwarding port 8015 to pod 8ac3e1fa664972c870275eec88e9f8c46b83acaa4eec3923e575ab, uid : exit status 1: 2022/06/29 07:30:45 socat[19829] E write(5, 0x56446125ba60, 5): Broken pipe
+Handling connection for 8015
+E0629 07:30:46.874004   17656 portforward.go:400] an error occurred forwarding 8015 -> 8015: error forwarding port 8015 to pod 8ac3e1fa664972c870275eec88e9f8c46b83acaa4eec3923e575ab, uid : exit status 1: 2022/06/29 07:30:46 socat[19898] E connect(5, AF=2 127.0.0.1:8015, 16): Connection refused
+Handling connection for 8015
+E0629 07:30:50.384468   17656 portforward.go:400] an error occurred forwarding 8015 -> 8015: error forwarding port 8015 to pod 8ac3e1fa664972c870275eec88e9f8c46b83acaa4eec3923e575ab, uid : exit status 1: 2022/06/29 07:30:50 socat[20000] E connect(5, AF=2 127.0.0.1:8015, 16): Connection refused
+Handling connection for 8015
+E0629 07:31:04.440538   17656 portforward.go:400] an error occurred forwarding 8015 -> 8015: error forwarding port 8015 to pod 8ac3e1fa664972c870275eec88e9f8c46b83acaa4eec3923e575ab, uid : exit status 1: 2022/06/29 07:31:04 socat[20259] E connect(5, AF=2 127.0.0.1:8015, 16): Connection refused
+Handling connection for 8015
+E0629 07:31:28.703608   17656 portforward.go:400] an error occurred forwarding 8015 -> 8015: error forwarding port 8015 to pod 8ac3e1fa664972c870275eec88e9f8c46b83acaa4eec3923e575ab, uid : exit status 1: 2022/06/29 07:31:28 socat[20769] E connect(5, AF=2 127.0.0.1:8015, 16): Connection refused
+Handling connection for 8015
+```
+
+6.打开idea，配置go remote
+![go-remote](../images/istio-go-remote.png)
+
+7.添加几个断点，由于pilot-discovery的定位是接收istio crd 和k8s原生资源的变化，所以我们创建vs资源，就能debug到我们本地代码中来
+```shell
+$ kubectl apply -f virtual-service-all-v1.yaml 
+virtualservice.networking.istio.io/productpage created
+virtualservice.networking.istio.io/reviews created
+virtualservice.networking.istio.io/ratings created
+virtualservice.networking.istio.io/details created
+```
+
+![pilot-discovery-debug](../images/istio-pilot-discovery-debug.png)
+
+
 [How to remote debug istiod pod using an IDE like IntelliJ or GoLand.](https://github.com/istio/istio/wiki/Remote-Debugging)
 
+[为 Istio 做了点微小的贡献](https://www.dozer.cc/2020/08/bugs-in-istio-1-6-0.html)
 
 
-
-
+## Istio 落地相关
 
 
 
