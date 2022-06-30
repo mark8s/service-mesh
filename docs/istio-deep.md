@@ -117,10 +117,14 @@ virtualservice.networking.istio.io/details created
 ![pilot-discovery-debug](../images/istio-pilot-discovery-debug.png)
 
 
+
+### 源码解析
+
+[Pilot源码分析（一）](https://haidong.dev/Pilot%E6%BA%90%E7%A0%81%E5%88%86%E6%9E%90%EF%BC%88%E4%B8%80%EF%BC%89/)
+
 [How to remote debug istiod pod using an IDE like IntelliJ or GoLand.](https://github.com/istio/istio/wiki/Remote-Debugging)
 
 [为 Istio 做了点微小的贡献](https://www.dozer.cc/2020/08/bugs-in-istio-1-6-0.html)
-
 
 ## Istio 落地相关
 
