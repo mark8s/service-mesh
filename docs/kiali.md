@@ -265,6 +265,45 @@ istio_requests_total{reporter="source",source_workload_namespace="default"}
 ```
 ![kiali-buildNamespaceTrafficMap](../images/kiali-buildNamespaceTrafficMap.png)
 
+## 远程调试kiali
+
+1.编译kiali代码: clone kiali代码，然后在根路径执行 go build ，得到 kiali 可执行文件
+
+2.重新build kiali镜像，dockerfiler如下
+```shell
+FROM quay.io/kiali/kiali:v1.50
+COPY ./kiali /usr/local/bin/kiali
+COPY ./dlv /usr/local/bin/dlv
+```
+3.替换deploy kiali的镜像为 `2.` 中编译的镜像名
+
+4.进入kiali容器，执行以下命令
+```shell
+$ kubectl exec -it kiali-67bd7689bf-z8tsr /bin/bash -n istio-system
+[kiali@kiali-67bd7689bf-z8tsr kiali]$ dlv --listen=:8015 --headless=true --api-version=2 --log attach 1
+```
+
+5. 使用idea，go remote 连接 kiali的pod
+```shell
+$ kubectl port-forward --address 0.0.0.0 deployment.apps/kiali -n istio-system 8015:8015 
+Forwarding from 0.0.0.0:8015 -> 8015
+Handling connection for 8015
+```
+
+![kiali debug](../images/kiali-debug.png)
+
+6.访问kiali ui，流量会进入自己的idea代码，然后打断点，调试就好
+
+![kiali debug](../images/kiali-debug2.png)
+
+
+
+
+
+
+
+
+
 ## Reference
 
 [metrics](https://istio.io/v1.6/docs/reference/config/policy-and-telemetry/metrics/)
