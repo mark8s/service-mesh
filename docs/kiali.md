@@ -265,7 +265,7 @@ istio_requests_total{reporter="source",source_workload_namespace="default"}
 ```
 ![kiali-buildNamespaceTrafficMap](../images/kiali-buildNamespaceTrafficMap.png)
 
-## 远程调试kiali
+## 远程调试kiali-使用dvl
 
 1.编译kiali代码: clone kiali代码，然后在根路径执行 go build ，得到 kiali 可执行文件
 
@@ -296,12 +296,7 @@ Handling connection for 8015
 
 ![kiali debug](../images/kiali-debug2.png)
 
-
-
-
-
-
-
+**注意** ： dlv运行的编译好的代码，也即可执行文件中打包好的代码，而非你idea本地的代码，你本地的改动是无法实时应用的。如果想应用，只能重新编译，重新做一个镜像。
 
 
 ## Reference
