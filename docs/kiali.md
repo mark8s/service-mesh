@@ -299,6 +299,185 @@ Handling connection for 8015
 **注意** ： dlv运行的编译好的代码，也即可执行文件中打包好的代码，而非你idea本地的代码，你本地的改动是无法实时应用的。如果想应用，只能重新编译，重新做一个镜像。
 
 
+##  如何build kiali的镜像
+
+很多小伙伴，可能会去修改kiali的代码，进行二次开发啥的，那么不可避免会遇到编译镜像的问题。下面会简单描述，如何编译kiali v1.29 版本的镜像，并push到我们自己的docker repository。
+
+```shell
+## 构建kiali镜像的cmd
+$ make container-build-kiali
+```
+
+```shell
+# /kiali/make/Makefile.container.mk
+container-build-kiali: .prepare-kiali-image-files
+ifeq ($(DORP),docker)
+	@echo Building container image for Kiali using docker
+	docker build --pull -t ${QUAY_TAG} -f ${OUTDIR}/docker/${KIALI_DOCKER_FILE} ${OUTDIR}/docker
+else
+	@echo Building container image for Kiali using podman
+	podman build --pull -t ${QUAY_TAG} -f ${OUTDIR}/docker/${KIALI_DOCKER_FILE} ${OUTDIR}/docker
+endif
+
+.prepare-kiali-image-files:
+	@CONSOLE_VERSION=${CONSOLE_VERSION} CONSOLE_LOCAL_DIR=${CONSOLE_LOCAL_DIR} deploy/get-console.sh
+	@echo Preparing container image files
+	@mkdir -p ${OUTDIR}/docker
+	@cp -r deploy/docker/* ${OUTDIR}/docker
+	@cp ${GOPATH}/bin/kiali* ${OUTDIR}/docker
+```
+
+上面只截取了`Makefile.container.mk`关键内容，可以看到核心逻辑是在`deploy/get-console.sh`中完成的，具体的内容如下：
+
+```shell
+#deploy/get-console.sh
+
+#!/bin/bash
+
+# This is a helper script used when building the docker image of Kaili.
+# You should not run this file directly. It is invoked through the main
+# Makefile when doing:
+#   $ make docker-build
+#
+# See the main Makefile for more info.
+set -x
+
+DIR=$(dirname $0)/..
+VERSION=${CONSOLE_VERSION:-latest}
+CONSOLE_DIR=${CONSOLE_LOCAL_DIR:-$DIR/../../../../../kiali-ui}
+
+mkdir -p $DIR/_output/docker
+if [ "$VERSION" = "local" ]; then
+  echo "Copying local console files from $CONSOLE_DIR"
+  rm -rf $DIR/_output/docker/console && mkdir $DIR/_output/docker/console
+  cp -r $CONSOLE_DIR/build/* $DIR/_output/docker/console
+
+  # If there is a version.txt file, use it (required for continuous delivery)
+  if [ ! -f "$DIR/_output/docker/console/version.txt" ]; then
+    # If jq command is available, don't do a trip to the web
+    if  ! type "jq" > /dev/null 2>&1 ; then
+      echo "$(npm -C $CONSOLE_DIR view $CONSOLE_DIR version)-local-$(cd $CONSOLE_DIR; git rev-parse HEAD)" > $DIR/_output/docker/console/version.txt
+    else
+      echo "$(jq -r '.version' $CONSOLE_DIR/package.json)-local-$(cd $CONSOLE_DIR; git rev-parse HEAD)" > $DIR/_output/docker/console/version.txt
+    fi
+  fi
+else
+  if [ ! -d "$DIR/_output/docker/console" ]; then
+    echo "Downloading console ($VERSION)..."
+    mkdir $DIR/_output/docker/console || exit 1
+    #curl -s $(npm view @kiali/kiali-ui@$VERSION dist.tarball) \
+    #    | tar zxf - --strip-components=2 --directory $DIR/_output/docker/console package/build || exit 1
+
+    tar zxf kiali-ui-1.29.1.tgz --strip-components=2 --directory $DIR/_output/docker/console package/build || exit 1
+
+    echo "$(npm view @kiali/kiali-ui@$VERSION version)" > \
+        $DIR/_output/docker/console/version.txt || exit 1
+  fi
+fi
+
+echo "Console version being packaged: $(cat $DIR/_output/docker/console/version.txt)"
+
+```
+
+以上内容的含义就是将`kiali-ui`下载下来，然后将其与编译后的`kiali` 放在一起，打包到镜像中。
+
+执行`make container-build-kiali`的日志：
+
+```shell
+[root@devopsman100 kiali]# make container-build-kiali
+++ dirname deploy/get-console.sh
++ DIR=deploy/..
++ VERSION=1.29.1
++ CONSOLE_DIR=/root/mark/kiali/../../../../../kiali-ui
++ mkdir -p deploy/../_output/docker
++ '[' 1.29.1 = local ']'
++ '[' '!' -d deploy/../_output/docker/console ']'
+++ cat deploy/../_output/docker/console/version.txt
++ echo 'Console version being packaged: 1.29.1'
+Console version being packaged: 1.29.1
+Preparing container image files
+Building container image for Kiali using docker
+docker build --pull -t leis17/kiali:v1.29 -f /root/mark/kiali/_output/docker/Dockerfile-ubi7-minimal /root/mark/kiali/_output/docker
+Sending build context to Docker daemon  60.54MB
+Step 1/10 : FROM registry.access.redhat.com/ubi7-minimal
+latest: Pulling from ubi7-minimal
+Digest: sha256:dae599fce48f1388a7268010241752b17ea8e1ca524a74fd848cd16bfc61f1e4
+Status: Image is up to date for registry.access.redhat.com/ubi7-minimal:latest
+ ---> 9d9aa39a7314
+Step 2/10 : LABEL maintainer="kiali-dev@googlegroups.com"
+ ---> Using cache
+ ---> 91c2db6cdb9d
+Step 3/10 : ENV KIALI_HOME=/opt/kiali     PATH=$KIALI_HOME:$PATH
+ ---> Using cache
+ ---> 5375ed9c59ee
+Step 4/10 : WORKDIR $KIALI_HOME
+ ---> Using cache
+ ---> f373caeb5555
+Step 5/10 : RUN microdnf install -y shadow-utils &&     microdnf clean all &&     rm -rf /var/cache/yum &&     adduser --uid 1000 kiali
+ ---> Using cache
+ ---> 18fbdc6773be
+Step 6/10 : COPY kiali $KIALI_HOME/
+ ---> bc92ddf09c88
+Step 7/10 : ADD console $KIALI_HOME/console/
+ ---> d56eabafb1cb
+Step 8/10 : RUN chown -R kiali:kiali $KIALI_HOME/console &&     chmod -R g=u $KIALI_HOME/console
+ ---> Running in d34637d70dff
+Removing intermediate container d34637d70dff
+ ---> 67960718f402
+Step 9/10 : USER 1000
+ ---> Running in 1e0d8beecda2
+Removing intermediate container 1e0d8beecda2
+ ---> 88bbc9cd7200
+Step 10/10 : ENTRYPOINT ["/opt/kiali/kiali"]
+ ---> Running in dfb8763d3d42
+Removing intermediate container dfb8763d3d42
+ ---> 462be3733560
+Successfully built 462be3733560
+Successfully tagged leis17/kiali:v1.29
+[root@devopsman100 kiali]# docker push leis17/kiali:v1.29
+The push refers to repository [docker.io/leis17/kiali]
+2ba0a3b4e5e1: Pushed 
+dc3cd4bb8401: Pushed 
+59de7d8a4054: Pushed 
+72b62fddd204: Layer already exists 
+d36fc5f2dbb8: Layer already exists 
+207cb0d50629: Layer already exists 
+487089fc863f: Layer already exists 
+v1.29: digest: sha256:eb7055ae0fa1141817e4aa5c225876514439afe77a8c5e67837bf473e41b53bf size: 1789
+
+```
+
+### 注意点
+
+#### 需要nodejs环境
+安装命令如下
+```shell
+$ wget https://npm.taobao.org/mirrors/node/v14.17.5/node-v14.17.5-linux-x64.tar.xz
+$ tar xf node-v14.17.5-linux-x64.tar.xz -C /usr/local/
+# 添加软连接
+$ ln -sfv /usr/local/node-v14.17.5-linux-x64 /usr/local/node
+# 添加环境变量
+$ echo 'export NODE_HOME=/usr/local/node
+export PATH=$NODE_HOME/bin:$PATH' >>/etc/profile
+# 加载环境变量
+$ source /etc/profile
+# 查看node版本
+$ node -v
+v14.17.5
+# 如果有换源需要的情况，可执行一下命令进行更换npm淘宝源。
+$ npm config set registry https://registry.npm.taobao.org/
+```
+
+#### 需要手动下载kiali-ui的包
+```shell
+$ npm view @kiali/kiali-ui@$VERSION dist.tarball
+```
+脚本有点问题，需要手动自己下载，然后放到指定位置。
+
+#### 需要科学上网
+构建镜像的过程中，需要你虚拟机能访问到外网，不然编译容易出错。
+
+
 ## Reference
 
 [metrics](https://istio.io/v1.6/docs/reference/config/policy-and-telemetry/metrics/)
