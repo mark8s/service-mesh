@@ -331,7 +331,6 @@ endif
 
 ```shell
 #deploy/get-console.sh
-
 #!/bin/bash
 
 # This is a helper script used when building the docker image of Kaili.
@@ -340,6 +339,7 @@ endif
 #   $ make docker-build
 #
 # See the main Makefile for more info.
+
 set -x
 
 DIR=$(dirname $0)/..
@@ -365,85 +365,95 @@ else
   if [ ! -d "$DIR/_output/docker/console" ]; then
     echo "Downloading console ($VERSION)..."
     mkdir $DIR/_output/docker/console || exit 1
-    #curl -s $(npm view @kiali/kiali-ui@$VERSION dist.tarball) \
-    #    | tar zxf - --strip-components=2 --directory $DIR/_output/docker/console package/build || exit 1
-
-    tar zxf kiali-ui-1.29.1.tgz --strip-components=2 --directory $DIR/_output/docker/console package/build || exit 1
-
+    curl -L  $(npm view @kiali/kiali-ui@$VERSION dist.tarball) \
+        | tar zxf - --strip-components=2 --directory $DIR/_output/docker/console package/build || exit 1
     echo "$(npm view @kiali/kiali-ui@$VERSION version)" > \
         $DIR/_output/docker/console/version.txt || exit 1
   fi
 fi
 
 echo "Console version being packaged: $(cat $DIR/_output/docker/console/version.txt)"
-
 ```
-
 以上内容的含义就是将`kiali-ui`下载下来，然后将其与编译后的`kiali` 放在一起，打包到镜像中。
+
+注意，`curl -L  $(npm view @kiali/kiali-ui@$VERSION dist.tarball) \` ，这里我将**curl -s** 换成了 **curl -L**
 
 执行`make container-build-kiali`的日志：
 
 ```shell
-[root@devopsman100 kiali]# make container-build-kiali
+➜  kiali git:(v1.30) ✗ make container-build-kiali
 ++ dirname deploy/get-console.sh
 + DIR=deploy/..
-+ VERSION=1.29.1
++ VERSION=1.30.0
 + CONSOLE_DIR=/root/mark/kiali/../../../../../kiali-ui
 + mkdir -p deploy/../_output/docker
-+ '[' 1.29.1 = local ']'
++ '[' 1.30.0 = local ']'
 + '[' '!' -d deploy/../_output/docker/console ']'
++ echo 'Downloading console (1.30.0)...'
+Downloading console (1.30.0)...
++ mkdir deploy/../_output/docker/console
++ tar zxf - --strip-components=2 --directory deploy/../_output/docker/console package/build
+++ npm view @kiali/kiali-ui@1.30.0 dist.tarball
++ curl -L https://registry.npmmirror.com/@kiali/kiali-ui/-/kiali-ui-1.30.0.tgz
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+100   189  100   189    0     0    429      0 --:--:-- --:--:-- --:--:--   429
+100 7557k  100 7557k    0     0  5912k      0  0:00:01  0:00:01 --:--:-- 5912k
+++ npm view @kiali/kiali-ui@1.30.0 version
++ echo 1.30.0
 ++ cat deploy/../_output/docker/console/version.txt
-+ echo 'Console version being packaged: 1.29.1'
-Console version being packaged: 1.29.1
++ echo 'Console version being packaged: 1.30.0'
+Console version being packaged: 1.30.0
 Preparing container image files
 Building container image for Kiali using docker
-docker build --pull -t leis17/kiali:v1.29 -f /root/mark/kiali/_output/docker/Dockerfile-ubi7-minimal /root/mark/kiali/_output/docker
-Sending build context to Docker daemon  60.54MB
-Step 1/10 : FROM registry.access.redhat.com/ubi7-minimal
-latest: Pulling from ubi7-minimal
-Digest: sha256:dae599fce48f1388a7268010241752b17ea8e1ca524a74fd848cd16bfc61f1e4
-Status: Image is up to date for registry.access.redhat.com/ubi7-minimal:latest
- ---> 9d9aa39a7314
+docker build --pull -t leis17/kiali:v1.30 -f /root/mark/kiali/_output/docker/Dockerfile-ubi8-minimal /root/mark/kiali/_output/docker
+Sending build context to Docker daemon   60.6MB
+Step 1/10 : FROM registry.access.redhat.com/ubi8-minimal
+latest: Pulling from ubi8-minimal
+Digest: sha256:c7b45019f4db32e536e69e102c4028b66bf5cde173cfff4ffd3281ccf7bb3863
+Status: Image is up to date for registry.access.redhat.com/ubi8-minimal:latest
+ ---> 734a461bdaf7
 Step 2/10 : LABEL maintainer="kiali-dev@googlegroups.com"
  ---> Using cache
- ---> 91c2db6cdb9d
+ ---> df5805f2799a
 Step 3/10 : ENV KIALI_HOME=/opt/kiali     PATH=$KIALI_HOME:$PATH
  ---> Using cache
- ---> 5375ed9c59ee
+ ---> 2a4266826b38
 Step 4/10 : WORKDIR $KIALI_HOME
  ---> Using cache
- ---> f373caeb5555
+ ---> 5d7be7fb5192
 Step 5/10 : RUN microdnf install -y shadow-utils &&     microdnf clean all &&     rm -rf /var/cache/yum &&     adduser --uid 1000 kiali
  ---> Using cache
- ---> 18fbdc6773be
+ ---> 4ac6d10df48c
 Step 6/10 : COPY kiali $KIALI_HOME/
- ---> bc92ddf09c88
+ ---> Using cache
+ ---> 4ad53d678e62
 Step 7/10 : ADD console $KIALI_HOME/console/
- ---> d56eabafb1cb
+ ---> d24aee789ddc
 Step 8/10 : RUN chown -R kiali:kiali $KIALI_HOME/console &&     chmod -R g=u $KIALI_HOME/console
- ---> Running in d34637d70dff
-Removing intermediate container d34637d70dff
- ---> 67960718f402
+ ---> Running in d105f766d3a4
+Removing intermediate container d105f766d3a4
+ ---> aab09d65c425
 Step 9/10 : USER 1000
- ---> Running in 1e0d8beecda2
-Removing intermediate container 1e0d8beecda2
- ---> 88bbc9cd7200
+ ---> Running in 69c29950b4ff
+Removing intermediate container 69c29950b4ff
+ ---> 1f1e2c9b183f
 Step 10/10 : ENTRYPOINT ["/opt/kiali/kiali"]
- ---> Running in dfb8763d3d42
-Removing intermediate container dfb8763d3d42
- ---> 462be3733560
-Successfully built 462be3733560
-Successfully tagged leis17/kiali:v1.29
-[root@devopsman100 kiali]# docker push leis17/kiali:v1.29
+ ---> Running in 4c2e5eedf2df
+Removing intermediate container 4c2e5eedf2df
+ ---> 4b5006cbba5a
+Successfully built 4b5006cbba5a
+Successfully tagged leis17/kiali:v1.30
+➜  kiali git:(v1.30) ✗ docker push leis17/kiali:v1.30
 The push refers to repository [docker.io/leis17/kiali]
-2ba0a3b4e5e1: Pushed 
-dc3cd4bb8401: Pushed 
-59de7d8a4054: Pushed 
-72b62fddd204: Layer already exists 
-d36fc5f2dbb8: Layer already exists 
-207cb0d50629: Layer already exists 
-487089fc863f: Layer already exists 
-v1.29: digest: sha256:eb7055ae0fa1141817e4aa5c225876514439afe77a8c5e67837bf473e41b53bf size: 1789
+6b0b959e6fe5: Pushed 
+0b92d3824166: Pushed 
+cfe143f9ae6b: Layer already exists 
+a9431c3963ec: Layer already exists 
+b2ecbba748ed: Layer already exists 
+8e0e04b5c700: Layer already exists 
+647a854c512b: Layer already exists 
+v1.30: digest: sha256:19482e902ab876340e5154e4e5ef30bcd1b63b0272468c8d4e7e4713ac4779eb size: 1789
 
 ```
 
@@ -468,15 +478,53 @@ v14.17.5
 $ npm config set registry https://registry.npm.taobao.org/
 ```
 
-#### 需要手动下载kiali-ui的包
-```shell
-$ npm view @kiali/kiali-ui@$VERSION dist.tarball
-```
-脚本有点问题，需要手动自己下载，然后放到指定位置。
 
 #### 需要科学上网
 构建镜像的过程中，需要你虚拟机能访问到外网，不然编译容易出错。
 
+出错日志：包下载不下来
+
+```shell
+➜  kiali git:(v1.31) ✗ make container-build-kiali
+++ dirname deploy/get-console.sh
++ DIR=deploy/..
++ VERSION=1.31.0
++ CONSOLE_DIR=/root/kiali/../../../../../kiali-ui
++ mkdir -p deploy/../_output/docker
++ '[' 1.31.0 = local ']'
++ '[' '!' -d deploy/../_output/docker/console ']'
+++ cat deploy/../_output/docker/console/version.txt
++ echo 'Console version being packaged: 1.29.1'
+Console version being packaged: 1.29.1
+Preparing container image files
+Building container image for Kiali using docker
+docker build --pull -t leis17/kiali:v1.31 -f /root/kiali/_output/docker/Dockerfile-ubi8-minimal /root/kiali/_output/docker
+Sending build context to Docker daemon  60.54MB
+Step 1/10 : FROM registry.access.redhat.com/ubi8-minimal
+latest: Pulling from ubi8-minimal
+Digest: sha256:c7b45019f4db32e536e69e102c4028b66bf5cde173cfff4ffd3281ccf7bb3863
+Status: Image is up to date for registry.access.redhat.com/ubi8-minimal:latest
+ ---> 734a461bdaf7
+Step 2/10 : LABEL maintainer="kiali-dev@googlegroups.com"
+ ---> Using cache
+ ---> 08259b9f8151
+Step 3/10 : ENV KIALI_HOME=/opt/kiali     PATH=$KIALI_HOME:$PATH
+ ---> Using cache
+ ---> 73cceb3c843f
+Step 4/10 : WORKDIR $KIALI_HOME
+ ---> Using cache
+ ---> 62c04e1ff517
+Step 5/10 : RUN microdnf install -y shadow-utils &&     microdnf clean all &&     rm -rf /var/cache/yum &&     adduser --uid 1000 kiali
+ ---> Running in 164a96d59561
+
+(microdnf:8): librhsm-WARNING **: 03:22:39.714: Found 0 entitlement certificates
+
+(microdnf:8): librhsm-WARNING **: 03:22:39.716: Found 0 entitlement certificates
+Downloading metadata...
+error: cannot update repo 'ubi-8-baseos': Cannot download repomd.xml: Cannot download repodata/repomd.xml: All mirrors were tried; Last error: Curl error (6): Couldn't resolve host name for https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi8/8/x86_64/baseos/os/repodata/repomd.xml [Could not resolve host: cdn-ubi.redhat.com]
+The command '/bin/sh -c microdnf install -y shadow-utils &&     microdnf clean all &&     rm -rf /var/cache/yum &&     adduser --uid 1000 kiali' returned a non-zero code: 1
+make: *** [container-build-kiali] Error 1
+```
 
 ## Reference
 
