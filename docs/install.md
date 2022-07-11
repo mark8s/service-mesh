@@ -36,8 +36,7 @@ $ kubectl delete ns istio-system --grace-period=0 --force
 # 安装前设置Hostname
 $ hostnamectl set-hostname master-48
 
-$ ./k8sctl --master_ip 10.10.13.48 --node_ip 10.10.13.44 --node_ip 10.10.13.49 --user root --password password --installdocker --setup
-linux
+$ ./k8sctl --master_ip 10.10.13.48 --node_ip 10.10.13.44 --node_ip 10.10.13.49 --user root --password password --installdocker --setuplinux
 
 ```
 
