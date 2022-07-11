@@ -301,7 +301,7 @@ Handling connection for 8015
 
 ##  如何build kiali的镜像
 
-很多小伙伴，可能会去修改kiali的代码，进行二次开发啥的，那么不可避免会遇到编译镜像的问题。下面会简单描述，如何编译kiali v1.29 版本的镜像，并push到我们自己的docker repository。
+很多小伙伴，可能会去修改kiali的代码，进行二次开发啥的，那么不可避免会遇到编译镜像的问题。下面会简单描述，如何编译kiali v1.30 版本的镜像，并push到我们自己的docker repository。
 
 ```shell
 ## 构建kiali镜像的cmd
