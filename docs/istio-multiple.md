@@ -1,4 +1,4 @@
-# istio多集群
+# istio multiple cluster
 
 ## 部署模型
 
@@ -226,6 +226,9 @@ kubectl rollout restart deploy -n istio-system
 
 8.部署业务测试容器
 ```shell
+# 设置自动注入(cluster1和cluster2)
+kubectl label namespace default istio-injection=enabled
+
 # 部署bookinfo(cluster1和cluster2)
 kubectl apply -f  istio-1.11.5/samples/bookinfo/platform/kube/bookinfo.yaml
 
@@ -342,7 +345,7 @@ $ istioctl pc endpoint -n istio-system istio-ingressgateway-f5648b4b9-l6jbs.isti
 10.36.0.7:9080                   HEALTHY     OK                outbound|9080||productpage.default.svc.cluster.local
 ```
 
-测试
+测试跨集群流量
 
 在cluster1的sleep 容器中访问 helloworld.default 这个svc，由于cluster1中只部署了helloworld v1版本，而cluster2中只部署了helloworld v2版本。所以，如果响应是v1、v2切换，那么则表示我们的多集群部署成功了。
 
@@ -377,7 +380,11 @@ Hello version: v1, instance: helloworld-v1-776f57d5f6-8sb7f
 
 
 
-
+## 卸载
+```shell
+$ istioctl x uninstall --purge
+$ kubectl delete namespace istio-system
+```
 
 
 
