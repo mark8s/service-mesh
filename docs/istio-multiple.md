@@ -21,6 +21,30 @@
 
 如何选择正确的部署模型，取决于您对隔离性、性能和 HA 的要求。
 
+## 说明
+
+### topology.istio.io/network
+`topology.istio.io/network`: 用于标识一个或多个 Pod 的网络的标签。当 pod 在不同的网络中时，Istio 网关 （例如东西网关）通常用于建立连接 （使用 AUTO_PASSTHROUGH 模式）。此标签可应用于以下 帮助自动化 Istio 的多网络配置的资源。
+
+* Istio System Namespace: 将此标签应用于系统命名空间 为控制平面管理的 Pod 建立默认网络。 这通常在控制平面安装期间使用 管理员指定的值。
+
+* Pod: 将此标签应用于 pod 允许覆盖默认网络 在每个 pod 的基础上。这通常通过 webhook 应用于 pod 注入，但也可以由服务在pod上手动指定 所有者。每个集群中的 Istio 安装配置 webhook 注入 使用管理员指定的值。
+
+* Gateway Service: 将此标签应用于 Istio 网关的服务， 表示 Istio 应该使用这个服务作为网关 网络，在配置跨网络流量时。 Istio 将配置 驻留在网络外部以访问网关服务的 pod 通过 `spec.externalIPs`、`status.loadBalancer.ingress[].ip` 或在这种情况下 NodePort 服务的，Node 的地址。标签配置时 安装网关（例如东西网关）并且应该匹配 控制平面的默认网络（由 Istio 系统指定） 命名空间标签）或目标 pod 的网络。
+
+### 东西向网关
+东西向网关：east-west gateway的目标，除了作为跨集群东西向流量的入口点外，还使该过程对运营服务的团队透明。 为了实现这一目标，网关必须
+* 启用跨集群的细粒度流量管理
+* 路由加密流量以实现工作负载之间的相互身份验证
+
+为了理解这是如何实现的，我们需要介绍 Istio 的两个特性——SNI 集群和 SNI 自动直通(SNI clusters and SNI auto passthrough) ——以及它们如何修改网关的行为。
+
+
+### ExternalIP 
+
+
+
+
 ## 安装
 ### 准备
 1.两个k8s集群，配置如下
@@ -320,9 +344,48 @@ reviews-v2-7bf8c9648f-6ckfp.default                     SYNCED     SYNCED     SY
 reviews-v3-84779c7bbc-s2rkl.default                     SYNCED     SYNCED     SYNCED     SYNCED       istiod-64dfdcc9db-j7plx     1.11.5
 sleep-557747455f-7h9hd.default                          SYNCED     SYNCED     SYNCED     SYNCED       istiod-64dfdcc9db-j7plx     1.11.5
 
+## 这里查看任何pod的配置，都是一样的
 $ istioctl pc endpoint -n istio-system istio-ingressgateway-5cb96858b5-4zthw|grep productpage
 10.10.13.45:15443                HEALTHY     OK                outbound|9080||productpage.default.svc.cluster.local
 10.44.0.8:9080                   HEALTHY     OK                outbound|9080||productpage.default.svc.cluster.local
+
+# 或者
+$ istioctl pc endpoint productpage-v1-6b746f74dc-2qhqx
+ENDPOINT                         STATUS      OUTLIER CHECK     CLUSTER
+10.10.13.45:15443                HEALTHY     OK                outbound|5000||helloworld.default.svc.cluster.local
+10.10.13.45:15443                HEALTHY     OK                outbound|80||sleep.default.svc.cluster.local
+10.10.13.45:15443                HEALTHY     OK                outbound|9080||details.default.svc.cluster.local
+10.10.13.45:15443                HEALTHY     OK                outbound|9080||productpage.default.svc.cluster.local
+10.10.13.45:15443                HEALTHY     OK                outbound|9080||ratings.default.svc.cluster.local
+10.10.13.45:15443                HEALTHY     OK                outbound|9080||reviews.default.svc.cluster.local
+10.10.13.48:6443                 HEALTHY     OK                outbound|443||kubernetes.default.svc.cluster.local
+10.32.0.2:53                     HEALTHY     OK                outbound|53||kube-dns.kube-system.svc.cluster.local
+10.32.0.2:9153                   HEALTHY     OK                outbound|9153||kube-dns.kube-system.svc.cluster.local
+10.36.0.1:15012                  HEALTHY     OK                outbound|15012||istio-eastwestgateway.istio-system.svc.cluster.local
+10.36.0.1:15017                  HEALTHY     OK                outbound|15017||istio-eastwestgateway.istio-system.svc.cluster.local
+10.36.0.1:15021                  HEALTHY     OK                outbound|15021||istio-eastwestgateway.istio-system.svc.cluster.local
+10.36.0.1:15443                  HEALTHY     OK                outbound|15443||istio-eastwestgateway.istio-system.svc.cluster.local
+10.36.0.3:9080                   HEALTHY     OK                outbound|9080||ratings.default.svc.cluster.local
+10.36.0.4:9080                   HEALTHY     OK                outbound|9080||reviews.default.svc.cluster.local
+10.36.0.5:15010                  HEALTHY     OK                outbound|15010||istiod.istio-system.svc.cluster.local
+10.36.0.5:15012                  HEALTHY     OK                outbound|15012||istiod.istio-system.svc.cluster.local
+10.36.0.5:15014                  HEALTHY     OK                outbound|15014||istiod.istio-system.svc.cluster.local
+10.36.0.5:15017                  HEALTHY     OK                outbound|443||istiod.istio-system.svc.cluster.local
+10.36.0.6:8080                   HEALTHY     OK                outbound|80||istio-ingressgateway.istio-system.svc.cluster.local
+10.36.0.6:8443                   HEALTHY     OK                outbound|443||istio-ingressgateway.istio-system.svc.cluster.local
+10.36.0.6:15021                  HEALTHY     OK                outbound|15021||istio-ingressgateway.istio-system.svc.cluster.local
+10.44.0.1:53                     HEALTHY     OK                outbound|53||kube-dns.kube-system.svc.cluster.local
+10.44.0.1:9153                   HEALTHY     OK                outbound|9153||kube-dns.kube-system.svc.cluster.local
+10.44.0.2:5000                   HEALTHY     OK                outbound|5000||helloworld.default.svc.cluster.local
+10.44.0.3:80                     HEALTHY     OK                outbound|80||sleep.default.svc.cluster.local
+10.44.0.5:9080                   HEALTHY     OK                outbound|9080||details.default.svc.cluster.local
+10.44.0.6:9080                   HEALTHY     OK                outbound|9080||reviews.default.svc.cluster.local
+10.44.0.7:9080                   HEALTHY     OK                outbound|9080||reviews.default.svc.cluster.local
+10.44.0.8:9080                   HEALTHY     OK                outbound|9080||productpage.default.svc.cluster.local
+127.0.0.1:15000                  HEALTHY     OK                prometheus_stats
+127.0.0.1:15020                  HEALTHY     OK                agent
+unix://./etc/istio/proxy/SDS     HEALTHY     OK                sds-grpc
+unix://./etc/istio/proxy/XDS     HEALTHY     OK                xds-grpc
 ```
 
 cluster2:
@@ -379,7 +442,6 @@ Hello version: v1, instance: helloworld-v1-776f57d5f6-8sb7f
 结果很给力，多集群部署成功！
 
 
-
 ## 卸载
 ```shell
 $ istioctl x uninstall --purge
@@ -387,7 +449,8 @@ $ kubectl delete namespace istio-system
 ```
 
 
-
+## Reference
+[istio多集群探秘，部署了50次多集群后我得出的结论](https://blog.csdn.net/hxpjava1/article/details/120634273#:~:text=istio%E5%A4%9A%E9%9B%86%E7%BE%A4%E6%98%AF%E6%8C%87%E5%B0%86%E5%A4%9A%E4%B8%AAistio%E9%9B%86%E7%BE%A4%E8%81%94%E9%82%A6%E4%B8%BA%E4%B8%80%E4%B8%AA%E6%95%B4%E4%BD%93%E7%9A%84mesh%E3%80%82,%E6%AF%94%E5%A6%82%E6%9C%89%E4%B8%A4%E4%B8%AAk8s%E9%9B%86%E7%BE%A4%EF%BC%8C%E4%B8%8A%E9%9D%A2%E5%88%86%E5%88%AB%E9%83%A8%E7%BD%B2%E4%BA%86istio%E9%9B%86%E7%BE%A4%EF%BC%8C%E8%BF%99%E4%B8%A4%E4%B8%AAk8s%E9%9B%86%E7%BE%A4%E5%8F%AF%E4%BB%A5%E5%9C%A8%E4%B8%80%E4%B8%AA%E7%BD%91%E7%BB%9C%E4%B8%8B%EF%BC%8C%E4%B9%9F%E5%8F%AF%E4%BB%A5%E5%9C%A8%E5%A4%9A%E4%B8%AA%E7%BD%91%E7%BB%9C%E4%B8%8B%E3%80%82)
 
 
 
