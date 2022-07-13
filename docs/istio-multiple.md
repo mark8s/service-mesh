@@ -441,6 +441,10 @@ Hello version: v1, instance: helloworld-v1-776f57d5f6-8sb7f
 
 结果很给力，多集群部署成功！
 
+我们可以通过查看kiali的视图，更清晰看到流量的走向：
+
+![istio-multiple-kiali](../images/istio-multiple-kiali.png)
+
 
 ## 卸载
 ```shell

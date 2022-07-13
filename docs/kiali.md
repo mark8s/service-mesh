@@ -526,6 +526,17 @@ The command '/bin/sh -c microdnf install -y shadow-utils &&     microdnf clean a
 make: *** [container-build-kiali] Error 1
 ```
 
+
+## kiali Multi-cluster
+
+原文链接：[Multi-cluster Deployment](https://kiali.io/docs/features/multi-cluster/)
+
+Kiali v1.29 引入了对高级部署模型的实验性支持。推荐的 Kiali 部署模型是将 Kiali 实例与每个 Istio 主控制平面一起部署。每个 Kiali 实例都将像过去一样使用已配置的 Kubernetes、Prometheus 和 Jaeger 实例。
+它将关注由本地主节点管理的 istio 配置。
+
+
+
+
 ## Reference
 
 [metrics](https://istio.io/v1.6/docs/reference/config/policy-and-telemetry/metrics/)
