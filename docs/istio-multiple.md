@@ -21,7 +21,29 @@
 
 如何选择正确的部署模型，取决于您对隔离性、性能和 HA 的要求。
 
+「单网络」模式要求集群与集群处于同一个网络平面，pod IP 不重叠且可以直连；
+
+「多网络」模式，该模式下每个集群都有一个入口网关，供其他集群访问流量进入，不过需要考虑的是业务能否接受 mTLS 带来的开销。
+
+
 ## 说明
+
+### 概述
+
+单一网络多主架构
+> 单网关、单网络、多主架构部署指单个 Istio 服务网格（service mesh）运行在单个完全互联的网络上。网络内有多个集群，同时存在多个主集群（primary cluster）运行 Istio 控制平面。
+> 
+> 单一网络模型，即所有工作负载实例（指 pods）都可以直接相互访问、完全互联，而无需 Istio 网关。这里「可以直接相互访问」指的是 Pod 与 Pod 间互通（可互 ping），包括跨集群的 Pod 通信。不是指 Service 之间 Cluster IP 互相可 ping，Service 的 ClusterIP 不支持跨集群访问。ClusterIP 是虚拟 IP，没有对应实体，而跨集群 Pod IP 能互 ping 是因为路由表中存在对应网段的下一跳节点。
+> 
+> 多主架构指多个集群下，存在多个单独部署的 Istio 控制平面。我们知道，Istio 控制平面通过向Pod的 Envoy 代理下发service endpoint信息实现流量管理。因此单网格下，Istio 控制平面需要拿到所有集群的服务端点信息。服务端点发现需要配置 Istio 控制平面使其能访问每个集群的 kube-apiserver。
+
+单一网络主从架构
+
+> 在主从架构中，工作负载实例间可以互相通信，但从集群工作负载代理访问主集群的 Istio 控制平面需要通过 gateway。Gateway 本质上是一个运行在网格边缘的 Envoy proxy。注意，这里虽然在一个内网中，但暴露还是通过公网 IP 暴露。
+> 
+> 为什么单网络 pod 间可以直接通信还要通过 Gateway 暴露 Istio 控制平面？为了启动时有稳定的 IP 地址用于连接。
+> 
+> 安装istio时，从集群需要设置固定的地址参数 remotePilotAddress。
 
 ### topology.istio.io/network
 `topology.istio.io/network`: 用于标识一个或多个 Pod 的网络的标签。当 pod 在不同的网络中时，Istio 网关 （例如东西网关）通常用于建立连接 （使用 AUTO_PASSTHROUGH 模式）。此标签可应用于以下 帮助自动化 Istio 的多网络配置的资源。
@@ -42,8 +64,17 @@
 
 ### ExternalIP 
 
+### 多集群控制平面的Endpoint discovery
 
+Istio 控制平面通过为每个代理(proxy)提供服务端点(service endpoints)列表来管理网格内的流量。为了在多集群场景中进行这项工作，每个控制平面都必须观察每个集群中 API server的端点。 
 
+要为集群启用端点发现，管理员会生成一个远程密钥并将其部署到网格中的每个主集群。远程密钥包含凭据，授予对集群中 API 服务器的访问权限。
+
+然后，控制平面将连接并发现集群的服务端点，从而为这些服务启用跨集群负载平衡。
+
+![istio-Endpoint discovery](../images/istio-multiple-endpoint-discovery.png)
+
+默认情况下，Istio 会在每个集群的端点之间平均负载均衡请求。
 
 ## 安装
 ### 准备
@@ -136,79 +167,8 @@ kubectl create secret generic cacerts -n istio-system \
 $ popd
 ```
 
+### 单一网络多主架构的安装
 
-### 同网络多主架构的安装
-在 cluster1 和 cluster2 两个集群上安装 Istio 控制平面， 将每一个集群都设置为主集群（primary cluster）。 两个集群都运行在网络 network1 上，所以两个集群中的 Pod 可以直接通信。
-
-在此配置中，每一个控制平面都会监测两个集群 API 服务器的服务端点。
-
-服务的工作负载（pod 到 pod）跨集群边界直接通讯。
-
-![multiple](../images/istio-multiple-multiple-primary-clusters-on-the-same-network.png)
-
-说明
-> cluster1和cluster2在同一个网络network1，cluster1和cluster2分别有一个istiod，cluster1的istiod监控cluster1和cluster2的apiserver，cluster2的isitod监控cluster1和cluster2的apiserver。
-> 
-> cluster1的service链接cluster1的istiod，cluster2的service连的试cluster2的istiod。cluster1的service和cluster2的service直接链接。
-
-1.给istio-system namespace打标签
-
-```shell
-# cluster1
-kubectl  label namespace istio-system topology.istio.io/network=network1
-
-# cluster2
-kubectl  label namespace istio-system topology.istio.io/network=network1
-```
-
-
-2.生成istio operator部署文件
-
-```shell
-cat <<EOF > cluster1.yaml
-apiVersion: install.istio.io/v1alpha1
-kind: IstioOperator
-spec:
-  profile: demo
-  values:
-    global:
-      meshID: mesh1
-      multiCluster:
-        clusterName: cluster1
-      network: network1
-  meshConfig:
-    accessLogFile: /dev/stdout
-    enableTracing: true
-  components:
-    egressGateways:
-    - name: istio-egressgateway
-      enabled: true
-EOF
-```
-
-```shell
-
-cat <<EOF > cluster2.yaml
-apiVersion: install.istio.io/v1alpha1
-kind: IstioOperator
-spec:
-  profile: demo
-  values:
-    global:
-      meshID: mesh1
-      multiCluster:
-        clusterName: cluster2
-      network: network1
-  meshConfig:
-    accessLogFile: /dev/stdout
-    enableTracing: true
-  components:
-    egressGateways:
-    - name: istio-egressgateway
-      enabled: true
-EOF
-
-```
 
 
 
@@ -633,160 +593,12 @@ kubectl delete namespace istio-system
 kubectl rollout restart deploy
 ```
 
-## istio in action
-
-在最初的评估中，ACME 将跨集群扩展服务网格并启用跨集群流量管理、可观察性和安全性的能力视为选择使用服务网格的主要驱动力。为了支持多集群工作，该公司考虑了两种方法：在最初的评估中，ACME 将跨集群扩展服务网格并启用跨集群流量管理、可观察性和安全性的能力视为选择使用服务网格的主要驱动力。为了支持多集群工作，该公司考虑了两种方法：
-
-A multi-cluster service mesh requires cross-cluster discovery, connectivity, and common trust.
-
-满足这些标准可确保集群了解其他集群中运行的工作负载，工作负载可以相互连接，并且工作负载可以使用 Istio 策略进行身份验证和授权。所有这些都是建立多集群服务网格的先决条件。
-
-如前所述，Istio 要在集群之间建立多集群连接，只能通过访问对等集群中的 Kubernetes API 来发现工作负载。 对于某些组织来说，这可能是一种不良的安全态势，每个集群都可以访问所有其他集群的 API。 在这种情况下，网格联邦是一种更好的方法。 像Gloo Mesh这样的项目（https://docs.solo.io/gloo-mesh/
-最新）可以帮助实现自动化和安全态势。
-
-How workloads are discovered in multi-cluster deployments
-
-
-
-另一个先决条件是工作负载具有跨集群连接性。 当集群在平面网络中时，例如共享单个网络（如 Amazon VPC），或者当它们的网络使用网络对等连接时，工作负载可以使用 IP 地址连接，并且条件已经满足！ 但是，当集群在不同的网络中时，我们必须使用位于网络边缘的特殊 Istio 入口网关和代理跨集群流量。
-在多网络网格中桥接集群的入口网关被称为东西网关（见图 12.7）。 我们将在本章后面详细说明东西网关。
-
-我们需要解决的最后一个因素是多集群服务网格中的集群必须具有共同信任。 具有共同信任确保了对立集群的工作负载可以相互认证。 有两种方法可以在相对集群的工作负载之间实现共同信任。 第一个使用我们所说的插件 CA 证书：从公共根 CA 颁发的用户定义证书。 第二个集成了两个集群用来签署证书的外部 CA。
-
-东西向网关将代理请求反向到各自集群中的工作负载。
-
-多网络基础架构要求我们需要使用东西向网关来桥接网络以实现跨集群连接，但对于是使用复制控制平面部署模型还是使用单个控制平面仍留有余地。 决策是由业务需求驱动的。 
-在 ACME 的案例中，它的在线商店非常受欢迎：它每关闭一分钟就会花费数百万美元，真的！ 因此，高可用性是重中之重，我们将使用主-主部署模型，其中 Istio 控制平面部署在每个集群中。 
-综上所述，我们将建立一个多集群、多网络、多控制平面的服务网格，使用东西向网关来桥接网络并使用主-主部署模型。 让我们开始吧！
-
-topology.istio.io/network=west-network
-
-通过这些标签，Istio 形成了对网络拓扑的理解，并使用它来决定如何配置工作负载。
-
-Kubernetes 集群可以有很多租户并且可以跨越多个团队。
-Istio 提供了在集群中安装多个网格的选项，允许团队分别管理他们的网格操作。meshID 属性使我们能够识别此安装所属的网格。
-
-希望两个控制平面形成相同的网格，所以我们指定了相同 meshID：
-
-假设这是我们的起点：两个集群，每个集群都有需要连接的工作负载。 但是如果没有跨集群工作负载发现，则不会为相对集群中的工作负载配置 Sidecar 代理。 因此，我们的下一步是启用跨集群发现。
-
-为了让 Istio 能够通过身份验证以从远程集群查询信息，它需要一个服务帐户来定义其权限的身份和角色绑定。因此，Istio 在安装时会创建一个服务帐户（名为 istio-reader-service- account）具有最小权限集，
-另一个控制平面可以使用这些权限来验证自己并查找与工作负载相关的信息，例如服务和端点。 但是，我们需要将服务帐户令牌与证书一起提供给对方集群，以启动与远程集群的安全连接。
-
-为了简化东西向流量，大多数云提供商都启用了虚拟网络的对等互连——前提是网络地址空间不重叠。 对等虚拟网络中的服务使用 IPv4 和 IPv6 地址启动直接连接。 但是，网络对等互连是特定于云的功能。 每当我们想要连接不同云提供商中的集群或无法进行网络对等互连的本地时，Istio 提供的选项是东西向网关。 网关必须公开一个负载均衡器，该负载均衡器可以访问对面集群的工作负载。
-在本节中，我们设置了跨集群连接并展示了它是如何工作的。 它可能看起来很复杂，但我们相信理解它是如何工作的比让它工作更重要。 如果出现问题，您应该具备排除故障和恢复连接的知识和能力。
-
-东西向网关是入口网关，为每个服务的服务器名称指示 (SNI) 集群附加配置。 但什么是 SNI 集群？ SNI 集群就像常规的 Envoy 集群（参见第 10 章，第 10.3.2 节，查询 Envoy 集群配置小节），
-由方向、子集、端口和 FQDN 组成，它们将一组类似的工作负载分组到可以路由流量的位置。 但是，SNI 集群有一个关键区别：它们在 SNI 中编码所有 Envoy 集群信息。 
-这使东西向网关能够将加密流量代理到 SNI 中客户端指定的集群。 举个具体的例子，当一个客户端——比如 webapp——发起到远程集群中的工作负载——比如目录工作负载——的连接时，它会将目标集群编码到 SNI 中，如图 12.13 所示。
-
-因此，客户端可以做出细粒度的路由决策，网关可以从 SNI 标头中读取集群信息，然后将流量代理到客户端预期的工作负载。 所有这些都是在保持工作负载之间安全且相互验证的连接的同时发生的。
-
-对于网关，SNI 集群的配置是一项可选功能，可以通过使用环境变量ISTIO_META_ROUTER_MODE 将网关路由器模式设置为 sni-dnat 来启用，如下面的 IstioOperator 定义所示：
-
-安装了东西向网关并将路由器模式设置为 sni-dn 后，下一步是使用 SNI 自动直通模式通过东西向网关公开多集群 mTLS 端口。 Istio 很聪明，然后才使用 SNI 集群配置网关。
-
-为了理解 SNI 自动直通，让我们回忆一下手动 SNI 直通配置入口网关以根据 SNI 标头接纳流量（参见第 4 章，第 4.4.2 节）。 这表明为了路由允许的流量，服务运营商必须手动定义一个虚拟服务资源（见图 12.14）。 
-SNI 自动直通，顾名思义，不需要手动创建 VirtualService 来路由被允许的流量。 它是使用 SNI 集群完成的，当它的路由器模式设置为 sni-dnat（图 12.15）时，它会在东西网关中自动配置。
-
-要配置 Istio 的入口网关以允许流量进入集群并通过服务网格，我们将从探索两个 Istio 资源开始：网关和虚拟服务。 两者都是让流量在 Istio 中流动的基础，但我们只会在允许流量进入集群的上下文中查看它们。 我们将在第 5 章更全面地介绍 VirtualService。
-
-
-```shell
-~ istioctl -n istio-system pc listener deploy/istio-ingressgateway
-ADDRESS PORT  MATCH DESTINATION
-0.0.0.0 3000  ALL   Route: http.3000
-0.0.0.0 7575  ALL   Cluster: outbound|7575||networking-agent.service-mesh.svc.cluster.local
-0.0.0.0 9080  ALL   Route: http.9080
-0.0.0.0 9090  ALL   Route: http.9090
-0.0.0.0 15021 ALL   Inline Route: /healthz/ready*
-0.0.0.0 15090 ALL   Inline Route: /stats/prometheus*
-0.0.0.0 16686 ALL   Route: http.16686
-0.0.0.0 20001 ALL   Route: http.20001
-➜  ~ istioctl -n istio-system pc route deploy/istio-ingressgateway
-NOTE: This output only contains routes loaded via RDS.
-NAME           DOMAINS     MATCH                  VIRTUAL SERVICE
-http.9080      *           /*                     404
-http.9090      *           /*                     prometheus.monitoring
-http.3000      *           /*                     grafana.monitoring
-http.20001     *           /*                     solar-graph.service-mesh
-http.16686     *           /*                     jaeger.jaeger-infra
-               *           /stats/prometheus*     
-               *           /healthz/ready*        
-➜  ~ istioctl -n istio-system pc route deploy/istio-ingressgateway -o json --name http.20001
-[
-    {
-        "name": "http.20001",
-        "virtualHosts": [
-            {
-                "name": "*:20001",
-                "domains": [
-                    "*"
-                ],
-                "routes": [
-                    {
-                        "match": {
-                            "prefix": "/"
-                        },
-                        "route": {
-                            "cluster": "outbound|8080||solar-graph.service-mesh.svc.cluster.local",
-                            "timeout": "0s",
-                            "retryPolicy": {
-                                "retryOn": "connect-failure,refused-stream,unavailable,cancelled,retriable-status-codes",
-                                "numRetries": 2,
-                                "retryHostPredicate": [
-                                    {
-                                        "name": "envoy.retry_host_predicates.previous_hosts"
-                                    }
-                                ],
-                                "hostSelectionRetryMaxAttempts": "5",
-                                "retriableStatusCodes": [
-                                    503
-                                ]
-                            },
-                            "maxStreamDuration": {
-                                "maxStreamDuration": "0s"
-                            }
-                        },
-                        "metadata": {
-                            "filterMetadata": {
-                                "istio": {
-                                    "config": "/apis/networking.istio.io/v1alpha3/namespaces/service-mesh/virtual-service/solar-graph"
-                                }
-                            }
-                        },
-                        "decorator": {
-                            "operation": "solar-graph.service-mesh.svc.cluster.local:8080/*"
-                        }
-                    }
-                ],
-                "includeRequestAttemptCount": true
-            }
-        ],
-        "validateClusters": false
-    }
-]
-
-
-
-
-```
-
-Istio 的网关功能强大，不仅可以为 HTTP/HTTPS 流量提供服务，还可以通过 TCP 访问任何流量。 例如，我们可以通过入口网关公开数据库（如 MongoDB）或消息队列（如 Kafka）。 当 Istio 将流量视为普通 TCP 时，我们不会获得很多有用的功能，例如重试、请求级断路、复杂路由等。 这仅仅是因为 Istio 无法判断正在使用什么协议（除非使用了 Istio 理解的特定协议，例如 MongoDB）。 让我们看看如何通过 Istio 网关公开 TCP 流量，以便集群外的客户端可以与集群内运行的客户端进行通信。
-
-
-
-
-
-
-
-
 ## Reference
 [istio多集群探秘，部署了50次多集群后我得出的结论](https://blog.csdn.net/hxpjava1/article/details/120634273#:~:text=istio%E5%A4%9A%E9%9B%86%E7%BE%A4%E6%98%AF%E6%8C%87%E5%B0%86%E5%A4%9A%E4%B8%AAistio%E9%9B%86%E7%BE%A4%E8%81%94%E9%82%A6%E4%B8%BA%E4%B8%80%E4%B8%AA%E6%95%B4%E4%BD%93%E7%9A%84mesh%E3%80%82,%E6%AF%94%E5%A6%82%E6%9C%89%E4%B8%A4%E4%B8%AAk8s%E9%9B%86%E7%BE%A4%EF%BC%8C%E4%B8%8A%E9%9D%A2%E5%88%86%E5%88%AB%E9%83%A8%E7%BD%B2%E4%BA%86istio%E9%9B%86%E7%BE%A4%EF%BC%8C%E8%BF%99%E4%B8%A4%E4%B8%AAk8s%E9%9B%86%E7%BE%A4%E5%8F%AF%E4%BB%A5%E5%9C%A8%E4%B8%80%E4%B8%AA%E7%BD%91%E7%BB%9C%E4%B8%8B%EF%BC%8C%E4%B9%9F%E5%8F%AF%E4%BB%A5%E5%9C%A8%E5%A4%9A%E4%B8%AA%E7%BD%91%E7%BB%9C%E4%B8%8B%E3%80%82)
 
+[Istio 多集群部署（一）：单一网络多主架构](https://huanggze.top/posts/istio-multicluster-deployment-part1/)
 
-
-
+[Endpoint discovery with multiple control planes](https://istio.io/latest/docs/ops/deployment/deployment-models/#endpoint-discovery-with-multiple-control-planes)
 
 
 
