@@ -64,6 +64,11 @@
 
 ### ExternalIP 
 
+### remote secret 
+添加remote secret方便 watch remote集群的node、namespace、service、endpoint等资源信息。
+
+如果istiod 报错 查询不了cluster2集群的一些资源，不管是没有权限，还是连接被拒，那都是remote secret 出现了问题，此时只要重新在 cluster2生成secret，然后在cluster1集群apply即可，此时istiod 不需要重启。因为它一直在watch 这个带有mutiple label的secret的资源。
+
 ### 多集群控制平面的Endpoint discovery
 
 Istio 控制平面通过为每个代理(proxy)提供服务端点(service endpoints)列表来管理网格内的流量。为了在多集群场景中进行这项工作，每个控制平面都必须观察每个集群中 API server的端点。 
@@ -169,8 +174,9 @@ $ popd
 
 ### 单一网络多主架构的安装
 
+[Istio 多集群部署（一）：单一网络多主架构](https://huanggze.top/posts/istio-multicluster-deployment-part1/)
 
-
+安装 cluster 2 时，为什么 remotePilotAddress 的参数不直接填 cluster 1 的 istiod Pod IP（明明是在同一网络，可以直连），却额外加了 Gateway 组件，填 Gateway 组件的 Service IP。实际上，这并不是多此一举。通过固定的 Gateway Service IP，这样不管cluster 1上的 istiod Pod 是挂了、扩缩容了，Pod IP 的变化都不会影响到 clutser 2.
 
 
 ### 跨网络单主架构的安装
@@ -585,6 +591,39 @@ Hello version: v1, instance: helloworld-v1-776f57d5f6-8sb7f
 
 ![istio-multiple-kiali](../images/istio-multiple-kiali.png)
 
+## 问题解决
+1.遇到istioctl pc endpoint 查不到remote 集群的情况？
+
+大概率remote secret的问题，这个时候可以查看 istiod的日志，大概是报没有权限访问cluster2，或者cluster1.这个时候需要重新生成secret
+也即：
+
+错误大致：
+```shell
+2022-07-20T03:48:40.209808Z	error	klog	k8s.io/client-go@v0.21.2/tools/cache/reflector.go:167: Failed to watch *v1.Secret: failed to list *v1.Secret: Get "https://10.10.13.45:1443/api/v1/secrets?limit=500&resourceVersion=0": dial tcp 10.10.13.45:1443: connect: connection refused
+2022-07-20T03:48:43.796183Z	error	watch error in cluster cluster2: failed to list *v1.Node: Get "https://10.10.13.45:1443/api/v1/nodes?limit=500&resourceVersion=0": dial tcp 10.10.13.45:1443: connect: connection refused
+2022-07-20T03:48:44.549585Z	error	watch error in cluster cluster2: failed to list *v1.Pod: Get "https://10.10.13.45:1443/api/v1/pods?limit=500&resourceVersion=0": dial tcp 10.10.13.45:1443: connect: connection refused
+2022-07-20T03:48:44.711990Z	error	watch error in cluster cluster2: failed to list *v1.Endpoints: Get "https://10.10.13.45:1443/api/v1/endpoints?limit=500&resourceVersion=0": dial tcp 10.10.13.45:1443: connect: connection refused
+2022-07-20T03:48:49.099263Z	error	watch error in cluster cluster2: failed to list *v1.Namespace: Get "https://10.10.13.45:1443/api/v1/namespaces?limit=500&resourceVersion=0": dial tcp 10.10.13.45:1443: connect: connection refused
+2022-07-20T03:49:08.399102Z	error	klog	k8s.io/client-go@v0.21.2/tools/cache/reflector.go:167: Failed to watch *v1.Secret: failed to list *v1.Secret: Get "https://10.10.13.45:1443/api/v1/secrets?limit=500&resourceVersion=0": dial tcp 10.10.13.45:1443: connect: connection refused
+2022-07-20T03:49:11.079862Z	error	watch error in cluster cluster2: failed to list *v1.Node: Get "https://10.10.13.45:1443/api/v1/nodes?limit=500&resourceVersion=0": dial tcp 10.10.13.45:1443: connect: connection refused
+2022-07-20T03:49:16.239802Z	error	watch error in cluster cluster2: failed to list *v1.Service: Get "https://10.10.13.45:1443/api/v1/services?limit=500&resourceVersion=0": dial tcp 10.10.13.45:1443: connect: connection refused
+2022-07-20T03:49:19.531369Z	error	watch error in cluster cluster2: failed to list *v1.Pod: Get "https://10.10.13.45:1443/api/v1/pods?limit=500&resourceVersion=0": dial tcp 10.10.13.45:1443: connect: connection refused
+2022-07-20T03:49:25.552513Z	info	ads	ADS: "10.36.0.0:39602" productpage-v1-8cc4bfc4c-q7wvx.default-18 terminated rpc error: code = Canceled desc = context canceled
+2022-07-20T03:49:25.833696Z	info	ads	ADS: new connection for node:productpage-v1-8cc4bfc4c-q7wvx.default-29
+2022-07-20T03:49:25.834860Z	info	ads	CDS: PUSH request for node:productpage-v1-8cc4bfc4c-q7wvx.default resources:27 size:23.3kB
+2022-07-20T03:49:25.834983Z	info	ads	EDS: PUSH request for node:productpage-v1-8cc4bfc4c-q7wvx.default resources:20 size:4.2kB empty:0 cached:20/20
+2022-07-20T03:49:25.837221Z	info	ads	LDS: PUSH request for node:productpage-v1-8cc4bfc4c-q7wvx.default resources:25 size:66.6kB
+2022-07-20T03:49:25.837549Z	info	ads	RDS: PUSH request for node:productpage-v1-8cc4bfc4c-q7wvx.default resources:10 size:8.8kB
+2022-07-20T03:49:35.365437Z	error	watch error in cluster cluster2: failed to list *v1.Endpoints: Get "https://10.10.13.45:1443/api/v1/endpoints?limit=500&resourceVersion=0": dial tcp 10.10.13.45:1443: connect: connection refused
+2022-07-20T03:49:35.681031Z	error	watch error in cluster cluster2: failed to list *v1.Namespace: Get "https://10.10.13.45:1443/api/v1/namespaces?limit=500&resourceVersion=0": dial tcp 10.10.13.45:1443: connect: connection refused
+```
+
+```shell
+istioctl x create-remote-secret --name=cluster2  --server=https://10.10.13.45:6443 > remote-secret-cluster2.yaml
+scp remote-secret-cluster2.yaml root@10.10.13.48:/root
+
+kubectl apply -f remote-secret-cluster1.yaml
+```
 
 ## 卸载
 ```shell
