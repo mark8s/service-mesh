@@ -32,7 +32,6 @@ d307261937e9        bridge              bridge              local
 
 
 
-
 ### Reference
 [Kubernetes网络篇——从docker0开始](https://morningspace.github.io/tech/k8s-net-docker0/)
 
