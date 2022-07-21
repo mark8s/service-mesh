@@ -599,23 +599,23 @@ Hello version: v1, instance: helloworld-v1-776f57d5f6-8sb7f
 
 错误大致：
 ```shell
-2022-07-20T03:48:40.209808Z	error	klog	k8s.io/client-go@v0.21.2/tools/cache/reflector.go:167: Failed to watch *v1.Secret: failed to list *v1.Secret: Get "https://10.10.13.45:1443/api/v1/secrets?limit=500&resourceVersion=0": dial tcp 10.10.13.45:1443: connect: connection refused
-2022-07-20T03:48:43.796183Z	error	watch error in cluster cluster2: failed to list *v1.Node: Get "https://10.10.13.45:1443/api/v1/nodes?limit=500&resourceVersion=0": dial tcp 10.10.13.45:1443: connect: connection refused
-2022-07-20T03:48:44.549585Z	error	watch error in cluster cluster2: failed to list *v1.Pod: Get "https://10.10.13.45:1443/api/v1/pods?limit=500&resourceVersion=0": dial tcp 10.10.13.45:1443: connect: connection refused
-2022-07-20T03:48:44.711990Z	error	watch error in cluster cluster2: failed to list *v1.Endpoints: Get "https://10.10.13.45:1443/api/v1/endpoints?limit=500&resourceVersion=0": dial tcp 10.10.13.45:1443: connect: connection refused
-2022-07-20T03:48:49.099263Z	error	watch error in cluster cluster2: failed to list *v1.Namespace: Get "https://10.10.13.45:1443/api/v1/namespaces?limit=500&resourceVersion=0": dial tcp 10.10.13.45:1443: connect: connection refused
-2022-07-20T03:49:08.399102Z	error	klog	k8s.io/client-go@v0.21.2/tools/cache/reflector.go:167: Failed to watch *v1.Secret: failed to list *v1.Secret: Get "https://10.10.13.45:1443/api/v1/secrets?limit=500&resourceVersion=0": dial tcp 10.10.13.45:1443: connect: connection refused
-2022-07-20T03:49:11.079862Z	error	watch error in cluster cluster2: failed to list *v1.Node: Get "https://10.10.13.45:1443/api/v1/nodes?limit=500&resourceVersion=0": dial tcp 10.10.13.45:1443: connect: connection refused
-2022-07-20T03:49:16.239802Z	error	watch error in cluster cluster2: failed to list *v1.Service: Get "https://10.10.13.45:1443/api/v1/services?limit=500&resourceVersion=0": dial tcp 10.10.13.45:1443: connect: connection refused
-2022-07-20T03:49:19.531369Z	error	watch error in cluster cluster2: failed to list *v1.Pod: Get "https://10.10.13.45:1443/api/v1/pods?limit=500&resourceVersion=0": dial tcp 10.10.13.45:1443: connect: connection refused
-2022-07-20T03:49:25.552513Z	info	ads	ADS: "10.36.0.0:39602" productpage-v1-8cc4bfc4c-q7wvx.default-18 terminated rpc error: code = Canceled desc = context canceled
-2022-07-20T03:49:25.833696Z	info	ads	ADS: new connection for node:productpage-v1-8cc4bfc4c-q7wvx.default-29
-2022-07-20T03:49:25.834860Z	info	ads	CDS: PUSH request for node:productpage-v1-8cc4bfc4c-q7wvx.default resources:27 size:23.3kB
-2022-07-20T03:49:25.834983Z	info	ads	EDS: PUSH request for node:productpage-v1-8cc4bfc4c-q7wvx.default resources:20 size:4.2kB empty:0 cached:20/20
-2022-07-20T03:49:25.837221Z	info	ads	LDS: PUSH request for node:productpage-v1-8cc4bfc4c-q7wvx.default resources:25 size:66.6kB
-2022-07-20T03:49:25.837549Z	info	ads	RDS: PUSH request for node:productpage-v1-8cc4bfc4c-q7wvx.default resources:10 size:8.8kB
-2022-07-20T03:49:35.365437Z	error	watch error in cluster cluster2: failed to list *v1.Endpoints: Get "https://10.10.13.45:1443/api/v1/endpoints?limit=500&resourceVersion=0": dial tcp 10.10.13.45:1443: connect: connection refused
-2022-07-20T03:49:35.681031Z	error	watch error in cluster cluster2: failed to list *v1.Namespace: Get "https://10.10.13.45:1443/api/v1/namespaces?limit=500&resourceVersion=0": dial tcp 10.10.13.45:1443: connect: connection refused
+2022-07-20T07:37:00.123573Z	error	klog	k8s.io/client-go@v0.21.2/tools/cache/reflector.go:167: Failed to watch *v1.Secret: failed to list *v1.Secret: Unauthorized
+2022-07-20T07:37:02.731547Z	error	watch error in cluster cluster1: failed to list *v1.Endpoints: Unauthorized
+2022-07-20T07:37:03.712391Z	info	klog	successfully acquired lease istio-system/istio-namespace-controller-election
+2022-07-20T07:37:03.712565Z	info	kube	starting namespace controller for cluster cluster2
+2022-07-20T07:37:03.813081Z	info	kube	Namespace controller started
+2022-07-20T07:37:10.226731Z	info	ads	ADS: new connection for node:reviews-v2-6dc56984f7-2p8cr.default-10
+2022-07-20T07:37:10.227898Z	info	ads	CDS: PUSH request for node:reviews-v2-6dc56984f7-2p8cr.default resources:31 size:29.5kB
+2022-07-20T07:37:10.228032Z	info	ads	EDS: PUSH request for node:reviews-v2-6dc56984f7-2p8cr.default resources:27 size:5.4kB empty:0 cached:27/27
+2022-07-20T07:37:10.229992Z	info	ads	LDS: PUSH request for node:reviews-v2-6dc56984f7-2p8cr.default resources:23 size:65.1kB
+2022-07-20T07:37:10.230353Z	info	ads	RDS: PUSH request for node:reviews-v2-6dc56984f7-2p8cr.default resources:12 size:12.0kB
+2022-07-20T07:37:30.256919Z	error	watch error in cluster cluster1: failed to list *v1.Service: Unauthorized
+2022-07-20T07:37:32.092940Z	error	klog	k8s.io/client-go@v0.21.2/tools/cache/reflector.go:167: Failed to watch *v1.Secret: failed to list *v1.Secret: Unauthorized
+2022-07-20T07:37:37.727143Z	error	watch error in cluster cluster1: failed to list *v1.Namespace: Unauthorized
+2022-07-20T07:37:38.099236Z	error	watch error in cluster cluster1: failed to list *v1.Node: Unauthorized
+2022-07-20T07:37:39.730465Z	error	watch error in cluster cluster1: failed to list *v1.Pod: Unauthorized
+2022-07-20T07:37:50.678676Z	error	watch error in cluster cluster1: failed to list *v1.Endpoints: Unauthorized
+2022-07-20T07:38:02.235830Z	error	watch error in cluster cluster1: failed to list *v1.Service: Unauthorized
 ```
 
 ```shell
